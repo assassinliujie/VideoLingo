@@ -30,6 +30,8 @@ def download_video_ytdlp(url, save_path='output', resolution='1080'):
         'outtmpl': f'{save_path}/%(title)s.%(ext)s',
         'noplaylist': True,
         'writethumbnail': True,
+        "cookiesfrombrowser": ("firefox",),
+        'proxy': 'http://127.0.0.1:7897',
         'postprocessors': [{'key': 'FFmpegThumbnailsConvertor', 'format': 'jpg'}],
     }
 

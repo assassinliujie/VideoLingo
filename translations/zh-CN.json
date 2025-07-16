@@ -54,6 +54,8 @@
     "Start Processing Subtitles": "开始处理字幕",
     "Download All Srt Files": "下载所有Srt文件",
     "Archive to 'history'": "归档到'history'",
+    "Open Output Folder": "打开输出文件夹",
+    "Start Proofreading": "开始校对",
     "Using Whisper for transcription...": "正在使用Whisper进行转录...",
     "Splitting long sentences...": "正在分割长句...",
     "Summarizing and translating...": "正在总结和翻译...",

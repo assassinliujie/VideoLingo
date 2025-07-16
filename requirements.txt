@@ -30,4 +30,7 @@ syllables
 pypinyin
 g2p-en
 xmltodict
+flask==3.0.2
+pysrt==1.1.2
+streamlit-player==0.1.0
 

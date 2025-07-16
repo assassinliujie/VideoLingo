@@ -77,6 +77,7 @@
     "Start Processing Subtitles": "Начать обработку субтитров",
     "Download All Srt Files": "Скачать все Srt файлы",
     "Archive to 'history'": "Архивировать в 'history'",
+    "Open Output Folder": "Открыть папку вывода",
     "Using Whisper for transcription...": "Используется Whisper для транскрипции...",
     "Splitting long sentences...": "Разделение длинных предложений...",
     "Summarizing and translating...": "Обобщение и перевод...",

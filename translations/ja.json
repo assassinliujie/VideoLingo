@@ -54,6 +54,7 @@
     "Start Processing Subtitles": "字幕処理を開始",
     "Download All Srt Files": "すべてのSrtファイルをダウンロード",
     "Archive to 'history'": "'history'にアーカイブ",
+    "Open Output Folder": "出力フォルダを開く",
     "Using Whisper for transcription...": "Whisperで文字起こしを実行中...",
     "Splitting long sentences...": "長文を分割中...",
     "Summarizing and translating...": "要約と翻訳中...",

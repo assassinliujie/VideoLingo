@@ -37,9 +37,19 @@ def text_processing_section():
                 st.video(SUB_VIDEO)
             download_subtitle_zip_button(text=t("Download All Srt Files"))
             
-            if st.button(t("Archive to 'history'"), key="cleanup_in_text_processing"):
-                cleanup()
-                st.rerun()
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button(t("Start Proofreading"), key="start_proofreading", type="primary"):
+                    start_proofreading()
+            with col2:
+                if st.button(t("Open Output Folder"), key="open_output_folder_text"):
+                    import subprocess
+                    output_path = os.path.abspath("output")
+                    subprocess.Popen(f'explorer "{output_path}"')
+            with col3:
+                if st.button(t("Archive to 'history'"), key="cleanup_in_text_processing"):
+                    cleanup()
+                    st.rerun()
             return True
 
 def process_text():
@@ -82,12 +92,21 @@ def audio_processing_section():
             st.success(t("Audio processing is complete! You can check the audio files in the `output` folder."))
             if load_key("burn_subtitles"):
                 st.video(DUB_VIDEO) 
-            if st.button(t("Delete dubbing files"), key="delete_dubbing_files"):
-                delete_dubbing_files()
-                st.rerun()
-            if st.button(t("Archive to 'history'"), key="cleanup_in_audio_processing"):
-                cleanup()
-                st.rerun()
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button(t("Open Output Folder"), key="open_output_folder_audio"):
+                    import subprocess
+                    output_path = os.path.abspath("output")
+                    subprocess.Popen(f'explorer "{output_path}"')
+            with col2:
+                if st.button(t("Delete dubbing files"), key="delete_dubbing_files"):
+                    delete_dubbing_files()
+                    st.rerun()
+            with col3:
+                if st.button(t("Archive to 'history'"), key="cleanup_in_audio_processing"):
+                    cleanup()
+                    st.rerun()
 
 def process_audio():
     with st.spinner(t("Generate audio tasks")): 
@@ -104,6 +123,62 @@ def process_audio():
     
     st.success(t("Audio processing complete! 🎇"))
     st.balloons()
+
+def start_proofreading():
+    """启动字幕校对工具"""
+    import webbrowser
+    import os
+    
+    # 检查必要的文件是否存在
+    subtitle_file = "output/src_trans.ass"
+    
+    if not os.path.exists(subtitle_file):
+        st.error("字幕文件 src_trans.ass 不存在，请先完成字幕生成步骤")
+        return
+    
+    # 查找原始视频文件
+    output_dir = "output"
+    video_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm']
+    original_video = None
+    
+    for file in os.listdir(output_dir):
+        if file.endswith(tuple(video_extensions)) and not file.startswith("output_"):
+            original_video = os.path.join(output_dir, file)
+            break
+    
+    if not original_video:
+        st.error("未找到原始视频文件，请确保output目录中有视频文件")
+        return
+    
+    st.success("✅ 字幕校对工具已启动！")
+    st.info("正在打开字幕编辑器...")
+    
+    try:
+        # 启动Streamlit字幕编辑器在8502端口
+        import threading
+        import time
+        import subprocess
+        
+        def start_editor():
+            # 启动字幕编辑器在8502端口
+            subprocess.Popen(['streamlit', 'run', 'subtitle_editor_streamlit.py', '--server.port=8502'])
+            time.sleep(2)  # 等待服务启动
+            webbrowser.open_new_tab('http://localhost:8502')
+        
+        threading.Thread(target=start_editor, daemon=True).start()
+        
+        # 显示说明
+        st.info("字幕编辑器将在新标签页中打开 (http://localhost:8502)")
+        st.info("请在新打开的窗口中进行字幕校对")
+        st.info("完成后关闭窗口即可返回主程序")
+        
+        # 提供手动启动的命令
+        st.code("streamlit run subtitle_editor_streamlit.py --server.port=8502", language="bash")
+        
+    except Exception as e:
+        st.error(f"启动字幕校对工具失败: {str(e)}")
+        st.info("您可以手动运行以下命令:")
+        st.code("streamlit run subtitle_editor_streamlit.py", language="bash")
 
 def main():
     logo_col, _ = st.columns([1,1])

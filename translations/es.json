@@ -54,6 +54,7 @@
     "Start Processing Subtitles": "Comenzar procesamiento de subtítulos",
     "Download All Srt Files": "Descargar todos los archivos Srt",
     "Archive to 'history'": "Archivar en 'history'",
+    "Open Output Folder": "Abrir carpeta de salida",
     "Using Whisper for transcription...": "Usando Whisper para transcripción...",
     "Splitting long sentences...": "Dividiendo oraciones largas...",
     "Summarizing and translating...": "Resumiendo y traduciendo...",

@@ -172,3 +172,11 @@ config.backup.yaml
 runtime/
 dev/
 installer_files/
+
+# Claude files
+.claude/
+
+# Test files
+test_*.py
+subtitle_editor_streamlit.py
+start.bat

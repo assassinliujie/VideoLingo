@@ -3,7 +3,10 @@ import os
 import re
 from rich.panel import Panel
 from rich.console import Console
-import autocorrect_py as autocorrect
+try:
+    import autocorrect_py as autocorrect
+except ImportError:
+    autocorrect = None
 from core.utils import *
 from core.utils.models import *
 console = Console()
@@ -14,6 +17,21 @@ SUBTITLE_OUTPUT_CONFIGS = [
     ('src_trans.srt', ['Source', 'Translation']),
     ('trans_src.srt', ['Translation', 'Source'])
 ]
+
+ASS_HEADER = """[Script Info]
+Title: Converted from SRT
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: 英,Tahoma,41,&H00FFFFFF,&H000000FF,&H003B3C3D,&H00000000,0,0,0,0,100,100,1,0,1,2.80001,0.2,2,0,0,11,1
+Style: 中,文泉驿微米黑,65,&H00FFFFFF,&H000000FF,&H006E4216,&H00000000,-1,0,0,0,100,100,0.499999,0,1,3.7,0.2,2,0,0,11,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
 
 AUDIO_SUBTITLE_OUTPUT_CONFIGS = [
     ('src_subs_for_audio.srt', ['Source']),
@@ -37,6 +55,77 @@ def remove_punctuation(text):
     text = re.sub(r'\s+', ' ', text)
     text = re.sub(r'[^\w\s]', '', text)
     return text.strip()
+
+def srt_time_to_ass_time(srt_time):
+    """Convert SRT time format (HH:MM:SS,mmm) to ASS time format (H:MM:SS.cc) with rounding"""
+    # Replace comma with period
+    time_str = srt_time.replace(',', '.')
+    time_parts = time_str.split(':')
+    
+    if len(time_parts) == 3:
+        hours = str(int(time_parts[0]))  # Remove leading zero
+        minutes = time_parts[1]
+        
+        # Handle seconds and milliseconds
+        seconds_part = time_parts[2]
+        if '.' in seconds_part:
+            seconds_str, milliseconds_str = seconds_part.split('.')
+            seconds = int(seconds_str)
+            milliseconds = int(milliseconds_str)
+            
+            # Convert milliseconds to centiseconds with proper rounding
+            centiseconds = round(milliseconds / 10)
+            
+            # Handle overflow when centiseconds >= 100
+            if centiseconds >= 100:
+                seconds += 1
+                centiseconds = 0
+            
+            return f"{hours}:{minutes}:{seconds:02d}.{centiseconds:02d}"
+        else:
+            return f"{hours}:{minutes}:{seconds_part}.00"
+    
+    return time_str
+
+def convert_srt_to_ass(srt_file_path, ass_file_path):
+    """Convert SRT file to ASS format with specified styles"""
+    try:
+        with open(srt_file_path, 'r', encoding='utf-8') as f:
+            srt_content = f.read()
+        
+        # Parse SRT content
+        subtitle_blocks = re.findall(r'(\d+)\n(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})\n((?:.|\n)*?)(?=\n\n|\Z)', srt_content)
+        
+        ass_events = []
+        entry_num = 1
+        
+        for block in subtitle_blocks:
+            start_time = srt_time_to_ass_time(block[1])
+            end_time = srt_time_to_ass_time(block[2])
+            text = block[3].strip().replace('\n', '\\N')
+            
+            # Determine style based on content (simple heuristic: if contains Chinese characters, use Chinese style)
+            if any('\u4e00' <= char <= '\u9fff' for char in text):
+                # Bilingual or Chinese content - alternate between Chinese and English styles
+                lines = text.split('\\N')
+                for i, line in enumerate(lines):
+                    style = "中" if i % 2 == 0 else "英"
+                    ass_events.append(f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{line}")
+            else:
+                # English content only
+                ass_events.append(f"Dialogue: 0,{start_time},{end_time},英,,0,0,0,,{text}")
+        
+        # Write ASS file
+        with open(ass_file_path, 'w', encoding='utf-8') as f:
+            f.write(ASS_HEADER)
+            f.write('\n'.join(ass_events))
+        
+        console.print(f"Successfully converted {os.path.basename(srt_file_path)} to {os.path.basename(ass_file_path)}")
+        return True
+        
+    except Exception as e:
+        console.print(f"Error converting SRT to ASS: {str(e)}")
+        return False
 
 def show_difference(str1, str2):
     """Show the difference positions between two strings"""
@@ -129,14 +218,34 @@ def align_timestamp(df_text, df_translate, subtitle_output_configs: list, output
 
     # Output subtitles 📜
     def generate_subtitle_string(df, columns):
-        return ''.join([f"{i+1}\n{row['timestamp']}\n{row[columns[0]].strip()}\n{row[columns[1]].strip() if len(columns) > 1 else ''}\n\n" for i, row in df.iterrows()]).strip()
+        if len(columns) > 1:
+            # For bilingual output, create separate entries for each language
+            entries = []
+            entry_num = 1
+            for i, row in df.iterrows():
+                # First language entry
+                entries.append(f"{entry_num}\n{row['timestamp']}\n{row[columns[0]].strip()}\n")
+                entry_num += 1
+                # Second language entry  
+                entries.append(f"{entry_num}\n{row['timestamp']}\n{row[columns[1]].strip()}\n")
+                entry_num += 1
+            return '\n\n'.join(entries).strip()
+        else:
+            # For single language output, keep original format
+            return ''.join([f"{i+1}\n{row['timestamp']}\n{row[columns[0]].strip()}\n\n" for i, row in df.iterrows()]).strip()
 
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
         for filename, columns in subtitle_output_configs:
             subtitle_str = generate_subtitle_string(df_trans_time, columns)
-            with open(os.path.join(output_dir, filename), 'w', encoding='utf-8') as f:
+            srt_file_path = os.path.join(output_dir, filename)
+            with open(srt_file_path, 'w', encoding='utf-8') as f:
                 f.write(subtitle_str)
+            
+            # Convert src_trans.srt to src_trans.ass
+            if filename == 'src_trans.srt':
+                ass_file_path = os.path.join(output_dir, 'src_trans.ass')
+                convert_srt_to_ass(srt_file_path, ass_file_path)
     
     return df_trans_time
 
@@ -145,7 +254,9 @@ def clean_translation(x):
     if pd.isna(x):
         return ''
     cleaned = str(x).strip('。').strip('，')
-    return autocorrect.format(cleaned)
+    if autocorrect:
+        return autocorrect.format(cleaned)
+    return cleaned
 
 def align_timestamp_main():
     df_text = pd.read_excel(_2_CLEANED_CHUNKS)
