@@ -9,58 +9,42 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 os.environ['PATH'] += os.pathsep + current_dir
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-st.set_page_config(page_title="VideoLingo", page_icon="docs/logo.svg")
+st.set_page_config(page_title="Alizoed's翻译工具", page_icon="docs/logo.svg")
 
 SUB_VIDEO = "output/output_sub.mp4"
 DUB_VIDEO = "output/output_dub.mp4"
 
 def text_processing_section():
-    st.header(t("b. Translate and Generate Subtitles"))
-    
     # 处理自动处理的加载状态
     if st.session_state.get('auto_processing_in_progress', False):
-        with st.spinner("🔄 正在自动生成字幕... 请稍候..."):
+        with st.spinner("🔄 AI正在处理字幕..."):
             return True
-    
-    with st.container(border=True):
-        st.markdown(f"""
-        <p style='font-size: 20px;'>
-        {t("This stage includes the following steps:")}
-        <p style='font-size: 20px;'>
-            1. {t("WhisperX word-level transcription")}<br>
-            2. {t("Sentence segmentation using NLP and LLM")}<br>
-            3. {t("Summarization and multi-step translation")}<br>
-            4. {t("Cutting and aligning long subtitles")}<br>
-            5. {t("Generating timeline and subtitles")}<br>
-            6. {t("Merging subtitles into the video")}
-        """, unsafe_allow_html=True)
 
-        if not os.path.exists(SUB_VIDEO):
-            # 自动处理时隐藏按钮
-            if not st.session_state.get('auto_processing_completed', False):
-                if st.button(t("Start Processing Subtitles"), key="text_processing_button"):
+    if not os.path.exists(SUB_VIDEO):
+        # 如果没有处理过，显示开始按钮
+        if not st.session_state.get('auto_processing_completed', False):
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🚀 开始AI字幕处理", key="text_processing_button", use_container_width=True, type="primary"):
                     process_text()
                     st.rerun()
-        else:
-            st.success("✅ 字幕处理已完成！")
-            if load_key("burn_subtitles"):
-                st.video(SUB_VIDEO)
-            download_subtitle_zip_button(text=t("Download All Srt Files"))
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                if st.button(t("Start Proofreading"), key="start_proofreading", type="primary"):
-                    start_proofreading()
-            with col2:
-                if st.button(t("Open Output Folder"), key="open_output_folder_text"):
-                    import subprocess
-                    output_path = os.path.abspath("output")
-                    subprocess.Popen(f'explorer "{output_path}"')
-            with col3:
-                if st.button(t("Archive to 'history'"), key="cleanup_in_text_processing"):
-                    cleanup()
-                    st.rerun()
-            return True
+    else:
+        # 已有处理结果，显示操作按钮
+        if load_key("burn_subtitles"):
+            st.video(SUB_VIDEO)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("✏️ 字幕校对", key="start_proofreading", type="primary"):
+                start_proofreading()
+        with col2:
+            if st.button("📁 打开文件夹", key="open_output_folder_text"):
+                import subprocess
+                output_path = os.path.abspath("output")
+                subprocess.Popen(f'explorer "{output_path}"')
+        with col3:
+            download_subtitle_zip_button(text="📥 下载字幕包")
+        return True
 
 def process_text():
     with st.spinner(t("Using Whisper for transcription...")):
@@ -77,44 +61,77 @@ def process_text():
         _5_split_sub.split_for_sub_main()
         _6_gen_sub.align_timestamp_main()
     with st.spinner(t("Merging subtitles to video...")):
+        # 直接调用，让ffmpeg在终端显示输出
         _7_sub_into_vid.merge_subtitles_to_video()
     
     st.success(t("Subtitle processing complete! 🎉"))
     st.balloons()
 
 def audio_processing_section():
-    st.header(t("c. Dubbing"))
-    with st.container(border=True):
-        st.markdown(f"""
-        <p style='font-size: 20px;'>
-        {t("This stage includes the following steps:")}
-        <p style='font-size: 20px;'>
-            1. {t("Generate audio tasks and chunks")}<br>
-            2. {t("Extract reference audio")}<br>
-            3. {t("Generate and merge audio files")}<br>
-            4. {t("Merge final audio into video")}
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 20px; border-radius: 15px; margin: 20px 0;'>
+        <h3 style='color: white; margin: 0; font-size: 1.5em;'>
+            🔊 第三步：AI智能配音
+        </h3>
+        <p style='color: rgba(255,255,255,0.9); margin: 10px 0 0 0;'>
+            语音合成与视频完美融合
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.container():
+        st.markdown("""
+        <div style='background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 5px solid #fa709a;'>
+            <h4 style='color: #333; margin-top: 0;'>🎵 配音流程</h4>
+            <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;'>
+                <div style='background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 3px solid #fa709a;'>
+                    <strong>🎯 任务生成</strong><br>
+                    <small>智能音频分段</small>
+                </div>
+                <div style='background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 3px solid #fa709a;'>
+                    <strong>🗣️ 语音克隆</strong><br>
+                    <small>AI语音合成</small>
+                </div>
+                <div style='background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 3px solid #fa709a;'>
+                    <strong>🎚️ 音频合并</strong><br>
+                    <small>无缝音频整合</small>
+                </div>
+                <div style='background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 3px solid #fa709a;'>
+                    <strong>🎬 视频合成</strong><br>
+                    <small>最终视频输出</small>
+                </div>
+            </div>
+        </div>
         """, unsafe_allow_html=True)
+
         if not os.path.exists(DUB_VIDEO):
-            if st.button(t("Start Audio Processing"), key="audio_processing_button"):
-                process_audio()
-                st.rerun()
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🎙️ 开始AI配音", key="audio_processing_button", use_container_width=True, type="primary"):
+                    process_audio()
+                    st.rerun()
         else:
-            st.success(t("Audio processing is complete! You can check the audio files in the `output` folder."))
+            st.markdown("""
+            <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 15px; margin: 20px 0; color: white; text-align: center;'>
+                <h4 style='margin: 0;'>🎉 配音完成！</h4>
+                <p style='margin: 5px 0 0 0; opacity: 0.9;'>AI配音已完美同步到视频</p>
+            </div>
+            """, unsafe_allow_html=True)
             if load_key("burn_subtitles"):
                 st.video(DUB_VIDEO) 
             
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button(t("Open Output Folder"), key="open_output_folder_audio"):
+                if st.button("📁 打开文件夹", key="open_output_folder_audio", use_container_width=True):
                     import subprocess
                     output_path = os.path.abspath("output")
                     subprocess.Popen(f'explorer "{output_path}"')
             with col2:
-                if st.button(t("Delete dubbing files"), key="delete_dubbing_files"):
+                if st.button("🗑️ 删除配音", key="delete_dubbing_files", use_container_width=True):
                     delete_dubbing_files()
                     st.rerun()
             with col3:
-                if st.button(t("Archive to 'history'"), key="cleanup_in_audio_processing"):
+                if st.button("🗂️ 清理文件", key="cleanup_in_audio_processing", use_container_width=True):
                     cleanup()
                     st.rerun()
 
@@ -185,12 +202,102 @@ def start_proofreading():
         st.code("streamlit run subtitle_editor_streamlit.py", language="bash")
 
 def main():
-    logo_col, _ = st.columns([1,1])
-    with logo_col:
-        st.image("docs/logo.png", use_column_width=True)
-    st.markdown(button_style, unsafe_allow_html=True)
-    welcome_text = t("Hello, welcome to VideoLingo. If you encounter any issues, feel free to get instant answers with our Free QA Agent <a href=\"https://share.fastgpt.in/chat/share?shareId=066w11n3r9aq6879r4z0v9rh\" target=\"_blank\">here</a>! You can also try out our SaaS website at <a href=\"https://videolingo.io\" target=\"_blank\">videolingo.io</a> for free!")
-    st.markdown(f"<p style='font-size: 20px; color: #808080;'>{welcome_text}</p>", unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    /* 全局样式变量 */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --info-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --background: #f8fafc;
+        --surface: #ffffff;
+        --text-primary: #1a202c;
+        --text-secondary: #718096;
+        --border: #e2e8f0;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 响应式网格布局 */
+    .responsive-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin: 1rem 0;
+    }
+    
+    @media (max-width: 768px) {
+        .responsive-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+    }
+    
+    /* 卡片样式 */
+    .feature-card {
+        background: var(--surface);
+        border-radius: 15px;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        padding: 2rem;
+        transition: all 0.3s ease;
+    }
+    
+    .feature-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+    }
+    
+    /* 标题样式 */
+    .main-title {
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 3em;
+        font-weight: 700;
+        text-align: center;
+        margin: 0.5em 0;
+    }
+    
+    .subtitle {
+        color: var(--text-secondary);
+        font-size: 1.3em;
+        text-align: center;
+        margin-bottom: 2em;
+    }
+    
+    /* 响应式按钮 */
+    .responsive-button {
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+    
+    @media (max-width: 768px) {
+        .main-title {
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            font-size: 1.1em;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .main-title {
+            font-size: 2em;
+        }
+        
+        .subtitle {
+            font-size: 1em;
+        }
+    }
+    </style>
+    <div class='main-title'>Alizoed's翻译工具</div>
+    <p class='subtitle'>AI驱动的视频翻译与配音工具</p>
+    """, unsafe_allow_html=True)
     
     # 初始化自动处理状态
     if 'auto_processing_in_progress' not in st.session_state:
@@ -210,10 +317,7 @@ def main():
             st.error(f"❌ 字幕烧录失败: {str(e)}")
             st.session_state.burn_subtitles = False
     
-    # add settings
-    with st.sidebar:
-        page_setting()
-        st.markdown(give_star_button, unsafe_allow_html=True)
+    # 设置信息已移至配置文件，不再显示侧边栏
     
     # 处理下载部分的返回
     download_result = download_video_section()

@@ -66,14 +66,26 @@ def download_video_async(url, save_path='output', resolution='1080', suffix=''):
     thread.start()
     return thread
 
-def find_video_files(save_path='output'):
+def find_video_files(save_path='output', prefer_best=True):
     video_files = [file for file in glob.glob(save_path + "/*") if os.path.splitext(file)[1][1:].lower() in load_key("allowed_video_formats")]
     # change \\ to /, this happen on windows
     if sys.platform.startswith('win'):
         video_files = [file.replace("\\", "/") for file in video_files]
     video_files = [file for file in video_files if not file.startswith("output/output")]
-    if len(video_files) != 1:
-        raise ValueError(f"Number of videos found {len(video_files)} is not unique. Please check.")
+    
+    if len(video_files) == 0:
+        raise ValueError("No video files found in the output directory.")
+    
+    if len(video_files) == 1:
+        return video_files[0]
+    
+    # If multiple videos found, prioritize best quality
+    if prefer_best:
+        best_files = [f for f in video_files if '_best.' in f or 'best.' in f]
+        if best_files:
+            return best_files[0]
+    
+    # Otherwise return the first one
     return video_files[0]
 
 if __name__ == '__main__':

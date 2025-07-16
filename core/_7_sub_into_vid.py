@@ -1,4 +1,5 @@
 import os, subprocess, time
+import sys
 from core._1_ytdlp import find_video_files
 import cv2
 import numpy as np
@@ -66,9 +67,14 @@ def merge_subtitles_to_video():
     TARGET_WIDTH = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
     TARGET_HEIGHT = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
     video.release()
+    
+    # 获取视频总时长用于进度计算
+    total_duration = get_video_duration(video_file)
     rprint(f"[bold green]Video resolution: {TARGET_WIDTH}x{TARGET_HEIGHT}[/bold green]")
+
     ffmpeg_cmd = [
         'ffmpeg', '-i', video_file,
+        '-v', 'info',  # 显示详细信息
         '-vf', (
             f"scale={TARGET_WIDTH}:{TARGET_HEIGHT}:force_original_aspect_ratio=decrease,"
             f"pad={TARGET_WIDTH}:{TARGET_HEIGHT}:(ow-iw)/2:(oh-ih)/2,"
@@ -78,7 +84,7 @@ def merge_subtitles_to_video():
             f"subtitles={TRANS_SRT}:force_style='FontSize={TRANS_FONT_SIZE},FontName={TRANS_FONT_NAME},"
             f"PrimaryColour={TRANS_FONT_COLOR},OutlineColour={TRANS_OUTLINE_COLOR},OutlineWidth={TRANS_OUTLINE_WIDTH},"
             f"BackColour={TRANS_BACK_COLOR},Alignment=2,MarginV=27,BorderStyle=4'"
-        ).encode('utf-8'),
+        ),
     ]
 
     ffmpeg_gpu = load_key("ffmpeg_gpu")
@@ -89,18 +95,17 @@ def merge_subtitles_to_video():
 
     rprint("🎬 Start merging subtitles to video...")
     start_time = time.time()
-    process = subprocess.Popen(ffmpeg_cmd)
-
+    
+    # 直接执行ffmpeg命令
     try:
-        process.wait()
-        if process.returncode == 0:
-            rprint(f"\n✅ Done! Time taken: {time.time() - start_time:.2f} seconds")
-        else:
-            rprint("\n❌ FFmpeg execution error")
+        process = subprocess.run(ffmpeg_cmd, check=True)
+        rprint(f"✅ 字幕烧录完成! 用时: {time.time() - start_time:.2f} 秒")
+    except subprocess.CalledProcessError as e:
+        rprint(f"❌ FFmpeg执行错误，返回码: {e.returncode}")
+        raise
     except Exception as e:
-        rprint(f"\n❌ Error occurred: {e}")
-        if process.poll() is None:
-            process.kill()
+        rprint(f"❌ 发生错误: {e}")
+        raise
 
 if __name__ == "__main__":
     merge_subtitles_to_video()
