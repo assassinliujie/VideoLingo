@@ -23,11 +23,11 @@ def update_ytdlp():
     from yt_dlp import YoutubeDL
     return YoutubeDL
 
-def download_video_ytdlp(url, save_path='output', resolution='1080'):
+def download_video_ytdlp(url, save_path='output', resolution='1080', suffix=''):
     os.makedirs(save_path, exist_ok=True)
     ydl_opts = {
         'format': 'bestvideo+bestaudio/best' if resolution == 'best' else f'bestvideo[height<={resolution}]+bestaudio/best[height<={resolution}]',
-        'outtmpl': f'{save_path}/%(title)s.%(ext)s',
+        'outtmpl': f'{save_path}/%(title)s{suffix}.%(ext)s',
         'noplaylist': True,
         'writethumbnail': True,
         "cookiesfrombrowser": ("firefox",),
@@ -52,6 +52,19 @@ def download_video_ytdlp(url, save_path='output', resolution='1080'):
             new_filename = sanitize_filename(filename)
             if new_filename != filename:
                 os.rename(os.path.join(save_path, file), os.path.join(save_path, new_filename + ext))
+
+def download_video_async(url, save_path='output', resolution='1080', suffix=''):
+    """异步下载视频，用于并行处理"""
+    import threading
+    def download_thread():
+        try:
+            download_video_ytdlp(url, save_path, resolution, suffix)
+        except Exception as e:
+            print(f"Download failed for {resolution}p: {e}")
+    
+    thread = threading.Thread(target=download_thread)
+    thread.start()
+    return thread
 
 def find_video_files(save_path='output'):
     video_files = [file for file in glob.glob(save_path + "/*") if os.path.splitext(file)[1][1:].lower() in load_key("allowed_video_formats")]

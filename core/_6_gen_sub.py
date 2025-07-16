@@ -3,10 +3,7 @@ import os
 import re
 from rich.panel import Panel
 from rich.console import Console
-try:
-    import autocorrect_py as autocorrect
-except ImportError:
-    autocorrect = None
+import autocorrect_py as autocorrect
 from core.utils import *
 from core.utils.models import *
 console = Console()
@@ -254,9 +251,7 @@ def clean_translation(x):
     if pd.isna(x):
         return ''
     cleaned = str(x).strip('。').strip('，')
-    if autocorrect:
-        return autocorrect.format(cleaned)
-    return cleaned
+    return autocorrect.format(cleaned)
 
 def align_timestamp_main():
     df_text = pd.read_excel(_2_CLEANED_CHUNKS)

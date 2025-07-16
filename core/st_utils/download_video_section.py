@@ -3,9 +3,10 @@ import re
 import shutil
 import subprocess
 from time import sleep
+import threading
 
 import streamlit as st
-from core._1_ytdlp import download_video_ytdlp, find_video_files
+from core._1_ytdlp import download_video_ytdlp, download_video_async, find_video_files
 from core.utils import *
 from translations.translations import translate as t
 
@@ -13,36 +14,80 @@ OUTPUT_DIR = "output"
 
 def download_video_section():
     st.header(t("a. Download or Upload Video"))
+    
+    # 初始化session state
+    if 'download_started' not in st.session_state:
+        st.session_state.download_started = False
+    if 'high_quality_downloaded' not in st.session_state:
+        st.session_state.high_quality_downloaded = False
+    if 'low_quality_downloaded' not in st.session_state:
+        st.session_state.low_quality_downloaded = False
+    if 'download_thread' not in st.session_state:
+        st.session_state.download_thread = None
+    if 'auto_start_processing' not in st.session_state:
+        st.session_state.auto_start_processing = False
+    
     with st.container(border=True):
         try:
+            # 检查是否有视频文件
             video_file = find_video_files()
             st.video(video_file)
-            if st.button(t("Delete and Reselect"), key="delete_video_button"):
-                os.remove(video_file)
-                if os.path.exists(OUTPUT_DIR):
-                    shutil.rmtree(OUTPUT_DIR)
-                sleep(1)
-                st.rerun()
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button(t("Delete and Reselect"), key="delete_video_button"):
+                    os.remove(video_file)
+                    if os.path.exists(OUTPUT_DIR):
+                        shutil.rmtree(OUTPUT_DIR)
+                    # 重置状态
+                    st.session_state.download_started = False
+                    st.session_state.high_quality_downloaded = False
+                    st.session_state.low_quality_downloaded = False
+                    st.session_state.download_thread = None
+                    sleep(1)
+                    st.rerun()
+            
+            with col2:
+                if st.button(t("Start Processing Subtitles"), key="start_processing", type="primary"):
+                    return "start_processing"
+            
+            with col3:
+                # 添加烧录字幕按钮
+                if os.path.exists("output/src_trans.ass") and st.button(t("Burn Subtitles"), key="burn_subtitles"):
+                    return "burn_subtitles"
+            
+            # 显示下载状态
+            if st.session_state.download_thread and st.session_state.download_thread.is_alive():
+                st.info("⏳ 正在下载最高画质视频...")
+            elif st.session_state.high_quality_downloaded:
+                st.success("✅ 最高画质视频下载完成")
+            
             return True
         except:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                url = st.text_input(t("Enter YouTube link:"))
-            with col2:
-                res_dict = {
-                    "360p": "360",
-                    "1080p": "1080",
-                    "Best": "best"
-                }
-                target_res = load_key("ytb_resolution")
-                res_options = list(res_dict.keys())
-                default_idx = list(res_dict.values()).index(target_res) if target_res in res_dict.values() else 0
-                res_display = st.selectbox(t("Resolution"), options=res_options, index=default_idx)
-                res = res_dict[res_display]
-            if st.button(t("Download Video"), key="download_button", use_container_width=True):
+            # 下载区域
+            url = st.text_input(t("Enter YouTube link:"))
+            
+            if st.button(t("Start Processing"), key="start_parallel_download", use_container_width=True, type="primary"):
                 if url:
-                    with st.spinner("Downloading video..."):
-                        download_video_ytdlp(url, resolution=res)
+                    # 清理之前的文件
+                    if os.path.exists(OUTPUT_DIR):
+                        shutil.rmtree(OUTPUT_DIR)
+                    os.makedirs(OUTPUT_DIR, exist_ok=True)
+                    
+                    # 先下载360p用于快速处理
+                    with st.spinner("📥 正在下载360P视频用于快速处理..."):
+                        download_video_ytdlp(url, resolution="360", suffix="_360p")
+                        st.session_state.low_quality_downloaded = True
+                    
+                    # 异步下载最高画质
+                    st.session_state.download_thread = download_video_async(url, resolution="best", suffix="_best")
+                    st.session_state.download_started = True
+                    st.session_state.high_quality_downloaded = False
+                    
+                    # 自动开始字幕处理
+                    st.success("✅ 360P视频下载完成，开始自动字幕处理...")
+                    st.session_state.auto_start_processing = True
+                    sleep(2)
                     st.rerun()
 
             uploaded_file = st.file_uploader(t("Or upload video"), type=load_key("allowed_video_formats") + load_key("allowed_audio_formats"))
@@ -60,6 +105,9 @@ def download_video_section():
 
                 if ext.lower() in load_key("allowed_audio_formats"):
                     convert_audio_to_video(os.path.join(OUTPUT_DIR, clean_name))
+                
+                # 上传完成后自动开始处理
+                st.session_state.auto_start_processing = True
                 st.rerun()
             else:
                 return False

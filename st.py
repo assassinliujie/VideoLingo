@@ -2,6 +2,7 @@ import streamlit as st
 import os, sys
 from core.st_utils.imports_and_utils import *
 from core import *
+from core.subtitle_burner import burn_subtitle_to_video
 
 # SET PATH
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,6 +16,12 @@ DUB_VIDEO = "output/output_dub.mp4"
 
 def text_processing_section():
     st.header(t("b. Translate and Generate Subtitles"))
+    
+    # 处理自动处理的加载状态
+    if st.session_state.get('auto_processing_in_progress', False):
+        with st.spinner("🔄 正在自动生成字幕... 请稍候..."):
+            return True
+    
     with st.container(border=True):
         st.markdown(f"""
         <p style='font-size: 20px;'>
@@ -29,10 +36,13 @@ def text_processing_section():
         """, unsafe_allow_html=True)
 
         if not os.path.exists(SUB_VIDEO):
-            if st.button(t("Start Processing Subtitles"), key="text_processing_button"):
-                process_text()
-                st.rerun()
+            # 自动处理时隐藏按钮
+            if not st.session_state.get('auto_processing_completed', False):
+                if st.button(t("Start Processing Subtitles"), key="text_processing_button"):
+                    process_text()
+                    st.rerun()
         else:
+            st.success("✅ 字幕处理已完成！")
             if load_key("burn_subtitles"):
                 st.video(SUB_VIDEO)
             download_subtitle_zip_button(text=t("Download All Srt Files"))
@@ -128,6 +138,7 @@ def start_proofreading():
     """启动字幕校对工具"""
     import webbrowser
     import os
+    from core.subtitle_burner import get_highest_quality_video
     
     # 检查必要的文件是否存在
     subtitle_file = "output/src_trans.ass"
@@ -136,15 +147,8 @@ def start_proofreading():
         st.error("字幕文件 src_trans.ass 不存在，请先完成字幕生成步骤")
         return
     
-    # 查找原始视频文件
-    output_dir = "output"
-    video_extensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm']
-    original_video = None
-    
-    for file in os.listdir(output_dir):
-        if file.endswith(tuple(video_extensions)) and not file.startswith("output_"):
-            original_video = os.path.join(output_dir, file)
-            break
+    # 查找最高质量视频文件
+    original_video = get_highest_quality_video()
     
     if not original_video:
         st.error("未找到原始视频文件，请确保output目录中有视频文件")
@@ -187,11 +191,54 @@ def main():
     st.markdown(button_style, unsafe_allow_html=True)
     welcome_text = t("Hello, welcome to VideoLingo. If you encounter any issues, feel free to get instant answers with our Free QA Agent <a href=\"https://share.fastgpt.in/chat/share?shareId=066w11n3r9aq6879r4z0v9rh\" target=\"_blank\">here</a>! You can also try out our SaaS website at <a href=\"https://videolingo.io\" target=\"_blank\">videolingo.io</a> for free!")
     st.markdown(f"<p style='font-size: 20px; color: #808080;'>{welcome_text}</p>", unsafe_allow_html=True)
+    
+    # 初始化自动处理状态
+    if 'auto_processing_in_progress' not in st.session_state:
+        st.session_state.auto_processing_in_progress = False
+    if 'auto_processing_completed' not in st.session_state:
+        st.session_state.auto_processing_completed = False
+    
+    # 处理烧录字幕的请求
+    if 'burn_subtitles' in st.session_state and st.session_state.burn_subtitles:
+        try:
+            with st.spinner("🔥 正在烧录字幕到视频中..."):
+                output_file = burn_subtitle_to_video()
+                st.success(f"✅ 字幕烧录完成！文件已保存为: {output_file}")
+                st.video(output_file)
+                st.session_state.burn_subtitles = False
+        except Exception as e:
+            st.error(f"❌ 字幕烧录失败: {str(e)}")
+            st.session_state.burn_subtitles = False
+    
     # add settings
     with st.sidebar:
         page_setting()
         st.markdown(give_star_button, unsafe_allow_html=True)
-    download_video_section()
+    
+    # 处理下载部分的返回
+    download_result = download_video_section()
+    
+    # 处理自动字幕处理
+    if st.session_state.get('auto_start_processing', False):
+        st.session_state.auto_start_processing = False
+        st.session_state.auto_processing_in_progress = True
+        
+        try:
+            process_text()
+            st.session_state.auto_processing_completed = True
+        finally:
+            st.session_state.auto_processing_in_progress = False
+        st.rerun()
+    
+    if download_result == "start_processing":
+        # 开始字幕处理（备用路径）
+        process_text()
+        st.rerun()
+    elif download_result == "burn_subtitles":
+        # 设置烧录字幕标志
+        st.session_state.burn_subtitles = True
+        st.rerun()
+    
     text_processing_section()
     audio_processing_section()
 
